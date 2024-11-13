@@ -10,11 +10,14 @@ import handler
 # Import the necessary functions from utils.py
 from utils import process_pdf, send_to_qdrant, qdrant_client, qa_ret, OpenAIEmbeddings
 
+# Telegram bot token from environment variable
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize the Telegram bot when the FastAPI app starts
     global bot_app
-    bot_app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    bot_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     
     # Add handlers
     bot_app.add_handler(CommandHandler("start", handler.start_command))
@@ -25,7 +28,7 @@ async def lifespan(app: FastAPI):
     # Start the bot
     await bot_app.initialize()
     await bot_app.start()
-    await bot_app.update_bot_data({})
+    #await bot_app.update_bot_data({})
     
     yield
     
@@ -33,8 +36,10 @@ async def lifespan(app: FastAPI):
     await bot_app.stop()
     await bot_app.shutdown()
 
+app = FastAPI(lifespan=lifespan)
 
-app = FastAPI()
+# Store for the Telegram bot application
+bot_app = None
 
 # Frontend URL
 FRONTEND_URL = os.getenv("FRONTEND_URL") 
