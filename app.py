@@ -1,11 +1,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import tempfile
 import os
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-import handler
 from telegram import Update
 
 # Import the necessary functions from utils.py
@@ -55,6 +53,8 @@ app.add_middleware(
 )
 
 # Define a model for the question API
+
+from pydantic import BaseModel
 class QuestionRequest(BaseModel):
     question: str
 
