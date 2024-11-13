@@ -1,8 +1,11 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import tempfile
 import os
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # Import the necessary functions from utils.py
 from utils import process_pdf, send_to_qdrant, qdrant_client, qa_ret, OpenAIEmbeddings
@@ -81,8 +84,8 @@ async def ask_question(question_request: QuestionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve answer: {str(e)}")
 
-# A simple health check endpoint
+#A simple health check endpoint
 @app.get("/")
 async def health_check():
-    return {"status": "Success"}
+    return {"status": "Hello There!"}
 

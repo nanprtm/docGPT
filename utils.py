@@ -1,6 +1,6 @@
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Qdrant
+from langchain_qdrant import QdrantVectorStore
 from langchain_community.embeddings import OpenAIEmbeddings
 from qdrant_client import QdrantClient
 from langchain.prompts import ChatPromptTemplate
@@ -40,7 +40,7 @@ def process_pdf(pdf_path):
 def send_to_qdrant(documents, embedding_model):
     """Send the document chunks to the Qdrant vector database."""
     try:
-        qdrant = Qdrant.from_documents(
+        qdrant = QdrantVectorStore.from_documents(
             documents,
             embedding_model,
             url=QDRANT_URL,
@@ -58,14 +58,12 @@ def send_to_qdrant(documents, embedding_model):
 # Function to initialize the Qdrant client and return the vector store object
 def qdrant_client():
     """Initialize Qdrant client and return the vector store."""
-    embedding_model = OpenAIEmbeddings(
-        openai_api_key=OPENAI_API_KEY, model="text-embedding-ada-002"
-    )
+    embedding_model = OpenAIEmbeddings(model="text-embedding-ada-002")
     qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-    qdrant_store = Qdrant(
+    qdrant_store = QdrantVectorStore(
         client=qdrant_client,
         collection_name="xeven_chatbot",
-        embeddings=embedding_model
+        embedding=embedding_model
     )
     return qdrant_store
 
@@ -113,7 +111,7 @@ def qa_ret(qdrant_store, input_query):
         output_parser = StrOutputParser()
 
         rag_chain = setup_and_retrieval | prompt | model | output_parser
-        response = rag_chain.invoke(input_query)
+        response  = rag_chain.invoke(input_query)
         return response
 
     except Exception as ex:
