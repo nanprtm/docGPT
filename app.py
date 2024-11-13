@@ -4,9 +4,35 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import tempfile
 import os
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
+import handler
 
 # Import the necessary functions from utils.py
 from utils import process_pdf, send_to_qdrant, qdrant_client, qa_ret, OpenAIEmbeddings
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize the Telegram bot when the FastAPI app starts
+    global bot_app
+    bot_app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    
+    # Add handlers
+    bot_app.add_handler(CommandHandler("start", handler.start_command))
+    bot_app.add_handler(CommandHandler("help", handler.help_command))
+    bot_app.add_handler(MessageHandler(filters.Document.PDF, handler.handle_pdf))
+    bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handler.handle_question))
+    
+    # Start the bot
+    await bot_app.initialize()
+    await bot_app.start()
+    await bot_app.update_bot_data({})
+    
+    yield
+    
+    # Cleanup when the FastAPI app shuts down
+    await bot_app.stop()
+    await bot_app.shutdown()
+
 
 app = FastAPI()
 
