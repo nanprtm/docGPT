@@ -3,7 +3,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Backgroun
 from fastapi.middleware.cors import CORSMiddleware
 import tempfile
 import os
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram import Update
 import logging
 
@@ -16,22 +16,32 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-async def start_command(update: Update, context):
-    await update.message.reply_text('Hello! I am your PDF assistant bot. Send me a PDF file and then ask questions about it.')
-
-async def help_command(update: Update, context):
-    await update.message.reply_text('Commands:\n/start - Start the bot\n/help - Show this help message')
-
 # Telegram bot token from environment variable
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-bot_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-bot_app.add_handler(CommandHandler("start", start_command))
-bot_app.add_handler(CommandHandler("help", help_command))
+async def init_bot():
+    """Initialize bot application"""
+    global bot_app
+    bot_app = (
+        Application.builder()
+        .token(TELEGRAM_BOT_TOKEN)
+        .build()
+    )
+    await bot_app.initialize()
+    
+    # Register handlers
+    bot_app.add_handler(CommandHandler("start", start_command))
+    bot_app.add_handler(CommandHandler("help", help_command))
+    bot_app.add_handler(MessageHandler(filters.Document.PDF, handle_pdf))
+    bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_question))
 
+    return bot_app
+
+# Update webhook setup
 async def set_telegram_webhook():
     """Sets the Telegram webhook."""
     try:
+        await init_bot()  # Initialize bot first
         webhook_url = f"{os.getenv('YOUR_APP_URL')}/telegram/webhook"
         logger.info(f"Setting webhook to: {webhook_url}")
         result = await bot_app.bot.set_webhook(webhook_url)
@@ -48,24 +58,16 @@ app.add_event_handler("startup", set_telegram_webhook)
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
     try:
-        # Log incoming request
         logger.info("Received webhook request")
-        
-        # Validate request headers
-        if request.headers.get("content-type") != "application/json":
-            logger.error("Invalid content type")
-            raise HTTPException(status_code=400, detail="Invalid content type")
-            
-        # Get request data
         data = await request.json()
         logger.info(f"Received update data: {data}")
         
-        # Process update
+        if not bot_app:
+            await init_bot()
+            
         update = Update.de_json(data, bot_app.bot)
         await bot_app.process_update(update)
-        
         return {"status": "ok"}
-        
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -152,10 +154,12 @@ async def health_check():
 # Telegram command handlers
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler for the /start command"""
+
+    user_name = update.message.from_user.first_name
     welcome_message = (
-        "👋 Welcome to your PDF Q&A Bot!\n\n"
+        f"Hi {user_name} 👋, Welcome to your ChatFelis!\n\n"
         "Here's how to use me:\n"
-        "1. Send me a PDF document 📄\n"
+        "1. Send me a document 📄\n"
         "2. Once I process it, you can ask me any questions about its content ❓\n"
         "3. I'll do my best to answer based on the document content 🤓\n\n"
         "Use /help to see all available commands."
@@ -233,7 +237,7 @@ async def handle_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         answer = qa_ret(qdrant_store, question)
         
         # Edit the thinking message with the answer
-        await thinking_message.edit_text(f"🔍 {answer}")
+        await thinking_message.edit_text(f"{answer}")
         
     except Exception as e:
         await update.message.reply_text(
