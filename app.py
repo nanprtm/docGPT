@@ -5,9 +5,14 @@ import tempfile
 import os
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram import Update
+import logging
 
 # Import the necessary functions from utils.py
 from utils import process_pdf, send_to_qdrant, qdrant_client, qa_ret, OpenAIEmbeddings
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -26,21 +31,44 @@ bot_app.add_handler(CommandHandler("help", help_command))
 
 async def set_telegram_webhook():
     """Sets the Telegram webhook."""
-    webhook_url = f"{os.getenv('YOUR_APP_URL')}/telegram/webhook"
-    await bot_app.bot.set_webhook(webhook_url)
+    try:
+        webhook_url = f"{os.getenv('YOUR_APP_URL')}/telegram/webhook"
+        logger.info(f"Setting webhook to: {webhook_url}")
+        result = await bot_app.bot.set_webhook(webhook_url)
+        logger.info(f"Webhook setup result: {result}")
+    except Exception as e:
+        logger.error(f"Failed to set webhook: {str(e)}")
+        raise
 
 # Run the startup function to set the webhook
 app.add_event_handler("startup", set_telegram_webhook)
 
 # Handle Telegram updates via webhook
+# Update the webhook endpoint
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
-    update = Update.de_json(await request.json(), bot_app.bot)
-    await bot_app.process_update(update)
-    return {"status": "ok"}
-
-# Store for the Telegram bot application
-#bot_app = None
+    try:
+        # Log incoming request
+        logger.info("Received webhook request")
+        
+        # Validate request headers
+        if request.headers.get("content-type") != "application/json":
+            logger.error("Invalid content type")
+            raise HTTPException(status_code=400, detail="Invalid content type")
+            
+        # Get request data
+        data = await request.json()
+        logger.info(f"Received update data: {data}")
+        
+        # Process update
+        update = Update.de_json(data, bot_app.bot)
+        await bot_app.process_update(update)
+        
+        return {"status": "ok"}
+        
+    except Exception as e:
+        logger.error(f"Error processing webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Frontend URL
 FRONTEND_URL = os.getenv("FRONTEND_URL") 
