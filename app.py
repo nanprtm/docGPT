@@ -9,35 +9,20 @@ from telegram import Update
 # Import the necessary functions from utils.py
 from utils import process_pdf, send_to_qdrant, qdrant_client, qa_ret, OpenAIEmbeddings
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     # Initialize the Telegram bot when the FastAPI app starts
-#     global bot_app
-#     bot_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    
-#     # Add handlers
-#     bot_app.add_handler(CommandHandler("start", start_command))
-#     bot_app.add_handler(CommandHandler("help", help_command))
-#     bot_app.add_handler(MessageHandler(filters.Document.PDF, handle_pdf))
-#     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_question))
-    
-#     # Start the bot
-#     await bot_app.initialize()
-#     await bot_app.start()
-#     #await bot_app.update_bot_data({})
-    
-#     yield
-    
-#     # Cleanup when the FastAPI app shuts down
-#     await bot_app.stop()
-#     await bot_app.shutdown()
-
 app = FastAPI()
+
+async def start_command(update: Update, context):
+    await update.message.reply_text('Hello! I am your PDF assistant bot. Send me a PDF file and then ask questions about it.')
+
+async def help_command(update: Update, context):
+    await update.message.reply_text('Commands:\n/start - Start the bot\n/help - Show this help message')
 
 # Telegram bot token from environment variable
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 bot_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+bot_app.add_handler(CommandHandler("start", start_command))
+bot_app.add_handler(CommandHandler("help", help_command))
 
 async def set_telegram_webhook():
     """Sets the Telegram webhook."""
