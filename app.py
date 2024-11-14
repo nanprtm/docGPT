@@ -9,36 +9,53 @@ from telegram import Update
 # Import the necessary functions from utils.py
 from utils import process_pdf, send_to_qdrant, qdrant_client, qa_ret, OpenAIEmbeddings
 
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     # Initialize the Telegram bot when the FastAPI app starts
+#     global bot_app
+#     bot_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    
+#     # Add handlers
+#     bot_app.add_handler(CommandHandler("start", start_command))
+#     bot_app.add_handler(CommandHandler("help", help_command))
+#     bot_app.add_handler(MessageHandler(filters.Document.PDF, handle_pdf))
+#     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_question))
+    
+#     # Start the bot
+#     await bot_app.initialize()
+#     await bot_app.start()
+#     #await bot_app.update_bot_data({})
+    
+#     yield
+    
+#     # Cleanup when the FastAPI app shuts down
+#     await bot_app.stop()
+#     await bot_app.shutdown()
+
+app = FastAPI()
+
 # Telegram bot token from environment variable
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Initialize the Telegram bot when the FastAPI app starts
-    global bot_app
-    bot_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    
-    # Add handlers
-    bot_app.add_handler(CommandHandler("start", start_command))
-    bot_app.add_handler(CommandHandler("help", help_command))
-    bot_app.add_handler(MessageHandler(filters.Document.PDF, handle_pdf))
-    bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_question))
-    
-    # Start the bot
-    await bot_app.initialize()
-    await bot_app.start()
-    #await bot_app.update_bot_data({})
-    
-    yield
-    
-    # Cleanup when the FastAPI app shuts down
-    await bot_app.stop()
-    await bot_app.shutdown()
+bot_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-app = FastAPI(lifespan=lifespan)
+async def set_telegram_webhook():
+    """Sets the Telegram webhook."""
+    webhook_url = f"{os.getenv('YOUR_APP_URL')}/telegram/webhook"
+    await bot_app.bot.set_webhook(webhook_url)
+
+# Run the startup function to set the webhook
+app.add_event_handler("startup", set_telegram_webhook)
+
+# Handle Telegram updates via webhook
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    update = Update.de_json(await request.json(), bot_app.bot)
+    await bot_app.process_update(update)
+    return {"status": "ok"}
 
 # Store for the Telegram bot application
-bot_app = None
+#bot_app = None
 
 # Frontend URL
 FRONTEND_URL = os.getenv("FRONTEND_URL") 
